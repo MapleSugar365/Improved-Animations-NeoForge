@@ -1,51 +1,150 @@
-subprojects {
-    apply plugin: 'java'
-    java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+plugins {
+    id 'java-library'
+    id 'eclipse'
+    id 'idea'
+    // NeoForged 开发插件
+    id 'net.neoforged.moddev' version '2.0.78'
+    // shadow 插件
+    id 'com.gradleup.shadow' version '8.3.6'
+}
 
-    jar {
-        manifest {
-            attributes([
-                    "Specification-Title": "${mod_name}",
-                    "Specification-Vendor": "${mod_author}",
-                    "Specification-Version": "1",
-                    "Implementation-Title": "${mod_name}",
-                    "Implementation-Version": "${mod_v}",
-                    "Implementation-Vendor": "${mod_author}",
-                    "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
-            ])
+tasks.named('wrapper', Wrapper).configure {
+    distributionType = Wrapper.DistributionType.ALL
+}
+
+version = mod_version
+group = mod_group_id
+
+repositories {
+    mavenLocal()
+    flatDir {
+        dirs 'libs'
+    }
+    mavenCentral()
+    maven {
+        name = "Modrinth"
+        url = "https://api.modrinth.com/maven"
+    }
+    maven {
+        name 'cursemaven'
+        url "https://www.cursemaven.com"
+        content {
+            includeGroup "curse.maven"
+        }
+    }
+}
+
+base {
+    archivesName = mod_name + '-neoforge-' + minecraft_version
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+neoForge {
+    // NeoForge 版本
+    version = project.neo_version
+
+    // 反混淆表
+    parchment {
+        mappingsVersion = project.parchment_mappings_version
+        minecraftVersion = project.parchment_minecraft_version
+    }
+
+    // 运行调试
+    runs {
+        client {
+            client()
+            gameDirectory = project.file('run/client')
+            programArguments = [
+                    "--username", "MapleSugar365"
+            ]
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        server {
+            server()
+            gameDirectory = project.file('run/server')
+            programArgument '--nogui'
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        gameTestServer {
+            type = "gameTestServer"
+            gameDirectory = project.file('run/gameTestServer')
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        data {
+            data()
+            gameDirectory = project.file('run/data')
+            programArguments.addAll '--mod', project.mod_id, '--all',
+                    '--output', file('src/generated/resources/').getAbsolutePath(),
+                    '--existing', file('src/main/resources/').getAbsolutePath()
+        }
+
+        configureEach {
+            jvmArguments = ['-XX:+IgnoreUnrecognizedVMOptions',
+                            '-XX:+AllowEnhancedClassRedefinition']
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            logLevel = org.slf4j.event.Level.DEBUG
         }
     }
 
-    repositories {
-        mavenCentral()
-
-        maven {
-            name = 'Sponge / Mixin'
-            url = 'https://repo.spongepowered.org/repository/maven-public/'
-        }
-
-        maven {
-            name = 'BlameJared Maven (CrT / Bookshelf)'
-            url = 'https://maven.blamejared.com'
-        }
-
-        maven {
-            url "https://cursemaven.com"
-            content {
-                includeGroup "curse.maven"
-            }
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
         }
     }
+}
 
-    tasks.withType(JavaCompile).configureEach {
-        it.options.encoding = 'UTF-8'
-        it.options.release = 17
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+configurations {
+    runtimeClasspath.extendsFrom localRuntime
+}
+
+dependencies {
+    implementation "net.neoforged:neoforge:${neo_version}"
+}
+
+tasks.withType(ProcessResources).configureEach {
+    var replaceProperties = [
+            minecraft_version      : minecraft_version,
+            minecraft_version_range: minecraft_version_range,
+            neo_version            : neo_version,
+            neo_version_range      : neo_version_range,
+            loader_version_range   : loader_version_range,
+            mod_id                 : mod_id,
+            mod_name               : mod_name,
+            mod_license            : mod_license,
+            mod_version            : mod_version,
+            mod_authors            : mod_authors,
+            mod_description        : mod_description
+    ]
+    inputs.properties replaceProperties
+
+    filesMatching(['META-INF/neoforge.mods.toml']) {
+        expand replaceProperties
     }
+}
 
-    // Disables Gradle's custom module metadata from being published to maven. The
-    // metadata includes mapped dependencies which are not reasonably consumable by
-    // other mod developers.
-    tasks.withType(GenerateModuleMetadata) {
-        enabled = false
+jar {
+    // enabled = false
+    manifest {
+        attributes([
+                "Implementation-Title"  : project.name,
+                "Implementation-Version": "${version}"
+        ])
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+idea {
+    module {
+        downloadSources = true
+        downloadJavadoc = true
     }
 }

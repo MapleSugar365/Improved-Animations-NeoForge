@@ -12,7 +12,7 @@ jobs:
       matrix:
         # Use these Java versions
         java: [
-          17,    # Current Java LTS & minimum supported by Minecraft
+          21,    # Current Java LTS & minimum supported by Minecraft
         ]
         # and run on Linux
         os: [ubuntu-20.04]
@@ -33,14 +33,8 @@ jobs:
       - name: build
         run: ./gradlew build
 
-      - name: Capture build artifacts (Fabric)
+      - name: Capture build artifacts (NeoForge)
         uses: actions/upload-artifact@v2
         with:
-          name: Artifacts-Fabric
-          path: Fabric/build/libs/
-
-      - name: Capture build artifacts (Forge)
-        uses: actions/upload-artifact@v2
-        with:
-          name: Artifacts-Forge
-          path: Forge/build/libs/
+          name: Artifacts-NeoForge
+          path: build/libs/
